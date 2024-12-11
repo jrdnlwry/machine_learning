@@ -11,10 +11,7 @@ library(dplyr)
 library(tidyr)
 library(caret)
 
-
-
 help(svm)
-
 
 ################################################################################
 # Read in and transform the data
@@ -60,7 +57,9 @@ readData = function(path){
   # drop uneeded columns
   drops = c("StandardHours", "Over18", "EmployeeID",
             "BusinessTravel", "Department", "EducationField",
-            "Gender", "JobRole", "MaritalStatus", "EmployeeCount")
+            "Gender", "JobRole", "MaritalStatus", "EmployeeCount",
+            "Attrition")
+  
   data = data[,!(names(data) %in% drops)] 
   # replace NAs with  a median value (numeric values only)
   data = data %>% mutate(across(where(is.numeric), ~replace_na(., median(., na.rm=TRUE))))
@@ -105,42 +104,71 @@ split = function(d){
 }
 
 df = split(df)
-# we have our training and testing dataset contained in the df variable
+# we have our training and testing data set contained in the df variable
 names(df)
 # sanity check
-nrow(df$training)
+head(df$training)
 nrow(df$testing)
+# separate the training response from the coefficients
+# prep training data
+xTrain = as.matrix(df$training[,-22])
+yTrain = as.factor(df$training[,22])
+datTrain = data.frame(x = xTrain, y = yTrain)
+datTrain$x.MonthlyIncome = as.numeric(datTrain$x.MonthlyIncome)
+datTrain$y <- as.factor(datTrain$y)
 
+# prep the test data
+xTest = as.matrix(df$testing[,-22])
+yTest = as.factor(df$testing[,22])
+datTest = data.frame(x = xTest, y = yTest)
+datTest$x.MonthlyIncome = as.numeric(datTest$x.MonthlyIncome)
+datTest$y <- as.factor(datTest$y)
 
-x = as.matrix(df$training[,-23])
-y = as.factor(df$training[,23])
+# sanity check
+nrow(xTrain)
+length(yTrain)
 
+# build dataframe to train model
+dat = data.frame(x = xTrain, y = yTrain)
 
-dat = data.frame(x = x, y = y)
-
-dat$x.MonthlyIncome = as.numeric(dat$x.MonthlyIncome)
+# df$training$AttrValue <- as.factor(df$training$AttrValue)
 
 
 svmfit = svm(y~., data=dat,
              kernel="linear", cost=10, scale=TRUE)
 
-names(svmfit)
-head(dat)
 
-names(dat$y)
+head(datTest)
+length(datTest)
+# predict using the test data set
+pred.svm = predict(svmfit,datTest[,1:21])
 
-help(tune)
+# calculate the model accuracy
+
+accuracy = sum(pred.svm == datTest[,22]) / nrow(datTest)
+
+
+
+
+
+
+
+
 kernels = c("linear", "radial")
-# creates a list of coeffiecents to test
-tune.out = tune(svm, y ~ ., data = dat, kernel = "radial",
+# creates a list of parameters to test
+tune.out = tune(svm, y ~ ., data = datTrain, kernel = "radial",
                 ranges = list(cost = c(0.001, 0.01, 0.1, 1, 5, 10, 1000)))
 
 # access the cross-validation errors for each of these models
 summary(tune.out)
 
 names(tune.out)
-tune.out$best.parameters
+# view the best parameter
+bestmod = tune.out$best.model
 
+pred.svm = predict(bestmod,datTest[,1:21])
 
+# calculate the model accuracy
+accuracy = sum(pred.svm == datTest[,22]) / nrow(datTest)
 
 
