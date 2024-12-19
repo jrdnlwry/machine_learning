@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from matplotlib.pyplot import subplots, cm
 import sklearn.model_selection as skm
 from ISLP import load_data, confusion_table
@@ -72,6 +72,11 @@ test = dataSplit[1]
 validate = dataSplit[2]
 
 """
+randomly split up the data for cross validation
+"""
+cvTrain = train.sample(n=50)
+
+"""
 Create X & Y labels for training + test data set
 """
 # TRAINING data
@@ -85,16 +90,49 @@ Ytest = test.iloc[:,-1]
 
 # 'linear','poly','rbf','sigmoid'
 
-# SVM estimator
-svmFit = SVC()
-# define the parameter grid
+"""
+Begin cross validation approach
+"""
+# rows in the training data set
+# print(len(Xtrain))
+
+# TRAINING data
+# X values
+XcvTrain = cvTrain.iloc[:,:-1]
+# Y values
+YcvTrain = cvTrain.iloc[:,-1]
+
+print(len(XcvTrain))
+
+"""
+This approach is computationally expensive
+
+kernels = list(['linear', 'rbf', 'poly', 'sigmoid'])
+c = list([0.001,0.01,0.1,1,10,100])
+gammas = list([0.1, 0.25, 0.5, 1])
+
+clf = SVC()
+clf.fit(XcvTrain, YcvTrain)
+param_grid = dict(kernel=kernels, C=c, gamma=gammas)
+grid = skm.GridSearchCV(clf, param_grid, cv=2, n_jobs=-1)
+grid.fit(XcvTrain,YcvTrain)
+"""
+# hyper parameters
+kernels = ["poly"]
+c = [1,10]
+gammas = [0.1, 0.5]
+clf = SVC()
+# create the parameter grid
 param_grid = {
-    'C':[0.001,0.01,0.1,1,5,10,100],
-    'kernel':['linear','rbf']
+  'kernel': kernels,
+  'C': c,
+  'gamma': gammas
 }
-# create the GridSearchCV object
-grid_search = skm.GridSearchCV(svmFit, param_grid, cv=5)
-# fit the model
-grid_search.fit(Xtrain, Ytrain)
-# print the best parameters
-print(grid_search.best_params_)
+# use stratifiedKFold for balanceed cross-validation
+cv = skm.StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+clf.fit(XcvTrain, YcvTrain)
+grid = skm.GridSearchCV(clf, param_grid, cv=cv, n_jobs=-1, verbose=1)
+grid.fit(XcvTrain, YcvTrain)
+
+print('Best Parameters:', grid.best_params_)
+print('Best Score:', grid.best_score_)
